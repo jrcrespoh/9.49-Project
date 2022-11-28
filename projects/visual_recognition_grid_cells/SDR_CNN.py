@@ -123,7 +123,7 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
             data, target = data.to(device), target.to(device)
             output = model(data)
 
-            all_sdrs.append(np.array(model.output_sdr(data)))
+            all_sdrs.append(np.array(model.output_sdr(data).cpu()))
             all_labels.append(target)
 
             loss += criterion(output, target, reduction="sum").item()  # sum up batch
@@ -134,7 +134,7 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
 
         # Track data on duty-cycle in order to optimize sparse representation for SDR
         # output
-        duty_cycle = (model.k_winner.duty_cycle[0, :, 0, 0]).numpy()
+        duty_cycle = (model.k_winner.duty_cycle[0, :, 0, 0]).cpu().numpy()
 
     print("\nMean duty cycle : " + str(np.mean(duty_cycle)))
     print("Stdev duty cycle: " + str(np.std(duty_cycle)))
@@ -147,8 +147,16 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
                 + str(epoch) + ".png")
     plt.clf()
 
-    all_sdrs = np.concatenate(all_sdrs, axis=0)
-    all_labels = np.concatenate(all_labels, axis=0)
+    #print('sdrs', type(all_sdrs[0]))
+    try:
+        all_sdrs = np.concatenate([a.cpu() for a in all_sdrs], axis=0)
+    except:
+        all_sdrs = np.concatenate(all_sdrs, axis=0)
+    #print('labels', type(all_labels[0]))
+    try:
+        all_labels = np.concatenate([a.cpu() for a in all_labels], axis=0)
+    except:
+        all_labels = np.concatenate(all_labels, axis=0)
 
     if sdr_output_subset is not None:
         print("Saving generated SDR and label outputs from data sub-section: "

@@ -589,9 +589,9 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
                                 print("Correctly classified "
                                       + objectDescription["name"][0])
                                 inferredStep = currentStep  # noqa: N806
-                                plt.imsave("correctly_classified/"
-                                           + objectDescription["name"]
-                                           + ".png", objectImage)
+                                # plt.imsave("correctly_classified/"
+                                #            + objectDescription["name"]
+                                #            + ".png", objectImage)
                                 incorrect = {"never_converged": 0,
                                              "false_convergence": 0}
 
@@ -609,11 +609,11 @@ class PIUNExperimentForVisualRecognition(PIUNExperiment):
                                       + str(np.argmax(class_node_activations)))
                                 incorrect = {"never_converged": 0,
                                              "false_convergence": 1}
-                                plt.imsave("misclassified/example_"
-                                           + objectDescription["name"]
-                                           + "_converged_to_"
-                                           + str(np.argmax(class_node_activations))
-                                           + ".png", objectImage)
+                                # plt.imsave("misclassified/example_"
+                                #            + objectDescription["name"]
+                                #            + "_converged_to_"
+                                #            + str(np.argmax(class_node_activations))
+                                #            + ".png", objectImage)
 
                                 return (None, incorrect, prediction_sequence,
                                         touchSequence, classification_visualization,
