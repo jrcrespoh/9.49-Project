@@ -52,7 +52,7 @@ FIRST_EPOCH_BATCH_SIZE = 4  # Used for optimizing k-WTA
 TRAIN_BATCH_SIZE = 128  # Recommend 128
 TEST_BATCH_SIZE = 1000
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 print("Using device: " + str(device))
 
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
         testing_cnn_len, testing_sdr_classifier_len) = data_setup()
 
     model_name = 'vit_base_patch16'
-    mae_checkpoint = '/storage/jecummin/projects/mae/checkpoints/mae_pretrain_vit_base.pth'
+    mae_checkpoint = 'checkpoints/mae_pretrain_vit_base.pth'
     sdr_mae = build_mae_model(model_name, mae_checkpoint)
 
     sdr_mae.to(device)

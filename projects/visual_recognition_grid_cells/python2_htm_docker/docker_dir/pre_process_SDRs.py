@@ -37,8 +37,8 @@ def generate_image_objects(
                          + data_set_section + ".npy")
     labels = np.load("training_and_testing_data/" + data_set + "_labels_"
                      + data_set_section + ".npy")
-    images = np.load("training_and_testing_data/" + data_set + "_images_"
-                     + data_set_section + ".npy")
+    # images = np.load("training_and_testing_data/" + data_set + "_images_"
+    #                  + data_set_section + ".npy")
 
     input_data_samples = []
     label_samples = []
@@ -56,7 +56,7 @@ def generate_image_objects(
         # Get num_samples_per_class of each digit/class type
         input_data_samples.extend(input_data[indices][0: num_samples_per_class])
         label_samples.extend(labels[indices][0: num_samples_per_class])
-        training_image_samples.extend(images[indices][0: num_samples_per_class])
+        # training_image_samples.extend(images[indices][0: num_samples_per_class])
 
         assert (len(labels[indices][0: num_samples_per_class])
                 == num_samples_per_class), "Insufficient training examples for loading"
@@ -81,14 +81,18 @@ def generate_image_objects(
         "8": 0,
         "9": 0}
 
+    objectWidth = 6
+    objectHeight = 6
     for sample_iter in range(len(label_samples)):
 
+        # sample_temp = np.reshape(input_data_samples[sample_iter],
+        #                          (128, objectWidth, objectWidth))
         sample_temp = np.reshape(input_data_samples[sample_iter],
-                                 (128, objectWidth, objectWidth))
+                                 (128, objectWidth, objectHeight))
         sample_features_list = []
 
         for width_iter in range(objectWidth):
-            for height_iter in range(objectWidth):
+            for height_iter in range(objectHeight):
 
                 # Convert the SDRs into sparse arrays (i.e. just representing the
                 # non-zero elements)

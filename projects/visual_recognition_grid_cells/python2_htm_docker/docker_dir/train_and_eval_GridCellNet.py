@@ -59,8 +59,9 @@ INPUT_GRID_DIMENSION = 5  # Options are 4 or 5, depending on the kind of pre-pro
 
 NUM_TEST_OBJECTS_PER_CLASS = 100  # The number of test objects per class to use during
 # evaluation
-DATASET = "mnist"  # Options are "mnist" or "fashion_mnist", although functionality
+#DATASET = "mnist"  # Options are "mnist" or "fashion_mnist", although functionality
 # for fashion-mnist may be incomplete
+DATASET = "cifar"
 SEED1 = 10
 SEED2 = 11
 BLOCKED_TRAINING_BOOL = True  # True by default; if False, shuffle the order of the
@@ -286,7 +287,8 @@ def object_learning_and_inference(
                 touch_sequence, classification_visualization,
                 single_converged_step) = ColumnPlusNet.inferObjectWithRandomMovements(
                     objectDescription,
-                    objectImage=object_images[object_iter],
+                    # objectImage=object_images[object_iter],
+                    objectImage=None,
                     cellsPerColumn=cellsPerColumn,
                     class_threshold=class_threshold,
                     inputGridDimension=INPUT_GRID_DIMENSION,
@@ -320,7 +322,8 @@ def object_learning_and_inference(
                  "correctly_classified": numSensationsToInference is not None,
                  "numSensationsToInference": numSensationsToInference,
                  "numSensationsToSingleConverge": single_converged_step,
-                 "ground_truth_image": object_images[object_iter]})
+                 # "ground_truth_image": object_images[object_iter]})
+                 "ground_truth_image": None})
 
             object_iter += 1
             if numSensationsToInference is None:

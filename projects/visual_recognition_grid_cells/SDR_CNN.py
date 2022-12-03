@@ -51,7 +51,8 @@ TRAIN_NEW_NET = True  # To generate all the SDRs needed for down-stream use in o
 PERCENT_ON = 0.15  # Recommend 0.15
 BOOST_STRENGTH = 20.0  # Recommend 20
 
-DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
+# DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
+DATASET = "cifar"
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of
 # SDRs by downstream classifiers)
 
@@ -62,7 +63,7 @@ FIRST_EPOCH_BATCH_SIZE = 4  # Used for optimizing k-WTA
 TRAIN_BATCH_SIZE = 128  # Recommend 128
 TEST_BATCH_SIZE = 1000
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 print("Using device: " + str(device))
 
 
@@ -202,9 +203,9 @@ class SDRCNNBase(nn.Module):
     This sparse operation can subsequently be binarized and output so as to
     generate SDR-like representaitons given an input image.
     """
-    def __init__(self, percent_on, boost_strength):
+    def __init__(self, in_channels, percent_on, boost_strength):
         super(SDRCNNBase, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=5,
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=5,
                                padding=2)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5,
@@ -212,7 +213,8 @@ class SDRCNNBase(nn.Module):
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.k_winner = KWinners2d(channels=128, percent_on=percent_on,
                                    boost_strength=boost_strength, local=True)
-        self.dense1 = nn.Linear(in_features=128 * 5 * 5, out_features=256)
+        self.shape = 6 if DATASET == 'cifar' else 5
+        self.dense1 = nn.Linear(in_features=128 * self.shape * self.shape, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
         self.softmax = nn.LogSoftmax(dim=1)
@@ -223,7 +225,7 @@ class SDRCNNBase(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
         x = self.k_winner(x)
-        x = x.view(-1, 128 * 5 * 5)
+        x = x.view(-1, 128 * self.shape * self.shape)
 
         return x
 
@@ -278,6 +280,18 @@ def data_setup():
                                              download=True,
                                              transform=normalize)
 
+    elif DATASET == "cifar":
+        print("Using CIFAR10 data-set")
+        normalize = transforms.Compose([transforms.ToTensor(),
+                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                            (0.247, 0.243, 0.261))])
+        train_dataset = datasets.CIFAR10("data", train=True, download=True,
+                                       transform=normalize)
+        test_dataset = datasets.CIFAR10("data", train=False,
+                                      download=True,
+                                      transform=normalize)
+
+
     total_traing_len = len(train_dataset)
     indices = range(total_traing_len)
     val_split = int(np.floor(0.1 * total_traing_len))
@@ -311,7 +325,8 @@ if __name__ == "__main__":
     (first_loader, train_loader, test_cnn_loader, test_sdrc_loader, training_len,
         testing_cnn_len, testing_sdr_classifier_len) = data_setup()
 
-    sdr_cnn = SDRCNNBase(percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
+    in_channels = 3 if DATASET == 'cifar' else 1
+    sdr_cnn = SDRCNNBase(in_channels=in_channels, percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
 
     sdr_cnn.to(device)
 

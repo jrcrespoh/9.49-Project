@@ -43,8 +43,11 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         x = x + self.pos_embed
         x = self.pos_drop(x)
 
+
         for blk in self.blocks:
             x = blk(x)
+
+        
 
         if self.global_pool:
             x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
@@ -58,8 +61,22 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     def output_sdr(self, inputs):
         """Returns a binarized SDR-like output from the ViT"s
         mid-level representations"""
-        x = self.forward_features(inputs)
+        # x = self.forward_features(inputs)
+        x = inputs
+        B = x.shape[0]
+        x = self.patch_embed(x)
+
+        cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+        x = torch.cat((cls_tokens, x), dim=1)
+        x = x + self.pos_embed
+        x = self.pos_drop(x)
+
+        for blk in self.blocks:
+            x = blk(x)
+
         x = (x > 0).float()
+
+        x = x[:,:6,:].reshape((x.size(0), -1))
 
         return x
 
