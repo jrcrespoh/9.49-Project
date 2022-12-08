@@ -64,7 +64,7 @@ FIRST_EPOCH_BATCH_SIZE = 4  # Used for optimizing k-WTA
 TRAIN_BATCH_SIZE = 128  # Recommend 128
 TEST_BATCH_SIZE = 1000
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device: " + str(device))
 
 
