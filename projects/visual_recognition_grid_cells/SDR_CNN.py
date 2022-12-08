@@ -39,6 +39,7 @@ from torchvision import datasets, transforms
 from tqdm import tqdm
 
 from nupic.torch.modules import KWinners2d, rezero_weights, update_boost_strength
+from bit import PreActBottleneck, tf2th
 
 seed_val = 1
 torch.manual_seed(seed_val)
@@ -57,6 +58,12 @@ DATASET = "cifar"
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of
 # SDRs by downstream classifiers)
 
+MODEL = "BiT"
+OUT_DIM = 256
+BLOCK_UNITS = [3]
+PRETRAINED = True
+WEIGHTS = "R50x1_160.npz"
+
 LEARNING_RATE = 0.01  # Recommend 0.01
 MOMENTUM = 0.5  # Recommend 0.5
 EPOCHS = 10  # Recommend 10
@@ -66,6 +73,7 @@ TEST_BATCH_SIZE = 1000
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device: " + str(device))
+print("Using model: "+MODEL)
 
 
 def train(model, loader, optimizer, criterion, post_batch_callback=None):
@@ -247,6 +255,66 @@ class SDRCNNBase(nn.Module):
         return x
 
 
+class SDRBiT(nn.Module):
+    """
+    BiT Classifier that uses k-WTA to create a sparse representation after the
+    second pooling operation.
+    This sparse operation can subsequently be binarized and output so as to
+    generate SDR-like representaitons given an input image.
+    """
+    def __init__(self, in_channels, percent_on, boost_strength):
+        super(SDRBiT, self).__init__()
+        self.root = nn.Sequential(OrderedDict([
+            ('conv', StdConv2d(in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)),
+            ('pad', nn.ConstantPad2d(1, 0)),
+            ('pool', nn.MaxPool2d(kernel_size=3, stride=2, padding=0)),
+        ]))
+        self.body = nn.Sequential(OrderedDict([
+            ('block1', nn.Sequential(OrderedDict(
+                [('unit01', PreActBottleneck(cin=64, cout=OUT_DIM, cmid=64))] +
+                [(f'unit{i:02d}', PreActBottleneck(cin=OUT_DIM, cout=OUT_DIM, cmid=64)) for i in range(2, BLOCK_UNITS[0] + 1)],
+            ))),
+        ]))
+        self.k_winner = KWinners2d(channels=OUT_DIM, percent_on=percent_on,
+                                   boost_strength=boost_strength, local=True)
+        with torch.no_grad(): self.shape = self.root(self.body(torch.zeros(3,128,128))).shape[-1]
+        self.dense1 = nn.Linear(in_features=OUT_DIM * self.shape * self.shape, out_features=256)
+        self.dense2 = nn.Linear(in_features=256, out_features=128)
+        self.output = nn.Linear(in_features=128, out_features=10)
+        self.softmax = nn.LogSoftmax(dim=1)
+    
+    def load_from(self, weights, prefix='resnet/'):
+        with torch.no_grad():
+            self.root.conv.weight.copy_(tf2th(weights[f'{prefix}root_block/standardized_conv2d/kernel']))
+            for bname, block in self.body.named_children():
+                for uname, unit in block.named_children():
+                    unit.load_from(weights, prefix=f'{prefix}{bname}/{uname}/')
+
+    def until_kwta(self, inputs):
+        x = self.root(x)
+        x = self.body(x)
+        x = self.k_winner(x)
+        x = x.view(-1, OUT_DIM * self.shape * self.shape)
+
+        return x
+
+    def forward(self, inputs):
+        x = self.until_kwta(inputs)
+        x = F.relu(self.dense1(x))
+        x = F.relu(self.dense2(x))
+        x = self.softmax(self.output(x))
+
+        return x
+
+    def output_sdr(self, inputs):
+        """Returns a binarized SDR-like output from the CNN"s
+        mid-level representations"""
+        x = self.until_kwta(inputs)
+        x = (x > 0).float()
+
+        return x
+
+
 def data_setup():
     """
     Note there are three data-sets used in all of the experiments; the training
@@ -283,14 +351,30 @@ def data_setup():
 
     elif DATASET == "cifar":
         print("Using CIFAR10 data-set")
-        normalize = transforms.Compose([transforms.ToTensor(),
-                                       transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                            (0.247, 0.243, 0.261))])
-        train_dataset = datasets.CIFAR10("data", train=True, download=True,
-                                       transform=normalize)
-        test_dataset = datasets.CIFAR10("data", train=False,
-                                      download=True,
-                                      transform=normalize)
+        
+        train_dataset = datasets.CIFAR10(
+            "data",
+            train=True,
+            download=True,
+            transform=transforms.Compose(
+                [] if MODEL != "BiT" else [transforms.Resize((160, 160)),
+                                           transforms.RandomCrop((128, 128)),
+                                           transforms.RandomHorizontalFlip(),] +
+                [transforms.ToTensor(),
+                 transforms.Normalize((0.4914, 0.4822, 0.4465),(0.247, 0.243, 0.261))]
+            )
+        )
+
+        test_dataset = datasets.CIFAR10(
+            "data",
+            train=False,
+            download=True,
+            transform=transforms.Compose(
+                [] if MODEL != "BiT" else [transforms.Resize((128, 128)),] +
+                [transforms.ToTensor(),
+                 transforms.Normalize((0.4914, 0.4822, 0.4465),(0.247, 0.243, 0.261))]
+            )
+        )
 
 
     total_traing_len = len(train_dataset)
@@ -327,8 +411,11 @@ if __name__ == "__main__":
         testing_cnn_len, testing_sdr_classifier_len) = data_setup()
 
     in_channels = 3 if DATASET == 'cifar' else 1
-    sdr_cnn = SDRCNNBase(in_channels=in_channels, percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
-
+    cnn = SDRCNNBase if MODEL != "BiT" else SDRBiT
+    sdr_cnn = cnn(in_channels=in_channels, percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
+    if PRETRAINED:
+        print("Loading weights from "+WEIGHTS)
+        sdr_cnn.load_from(np.load(WEIGHTS))
     sdr_cnn.to(device)
 
     if os.path.exists("saved_networks/") is False:
