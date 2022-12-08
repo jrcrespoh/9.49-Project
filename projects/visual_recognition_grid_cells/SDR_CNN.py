@@ -36,6 +36,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
+from tqdm import tqdm
 
 from nupic.torch.modules import KWinners2d, rezero_weights, update_boost_strength
 
@@ -83,7 +84,7 @@ def train(model, loader, optimizer, criterion, post_batch_callback=None):
     :type post_batch_callback: function
     """
     model.train()
-    for _batch_idx, (data, target) in enumerate(loader):
+    for _batch_idx, (data, target) in tqdm(enumerate(loader),total=len(loader)):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
@@ -119,7 +120,7 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
     all_labels = []
 
     with torch.no_grad():
-        for data, target in loader:
+        for data, target in tqdm(loader,total=len(loader)):
 
             data, target = data.to(device), target.to(device)
             output = model(data)
@@ -362,7 +363,7 @@ if __name__ == "__main__":
              epoch="pre_epoch", criterion=F.nll_loss)
 
         print("Performing full training")
-        for epoch in range(1, EPOCHS):
+        for epoch in tqdm(range(1, EPOCHS),total=EPOCHS):
             train(model=sdr_cnn, loader=train_loader, optimizer=sgd,
                   criterion=F.nll_loss, post_batch_callback=post_batch)
             sdr_cnn.apply(update_boost_strength)
