@@ -28,7 +28,6 @@ nupic.torch/examples
 """
 
 import os
-from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,7 +39,7 @@ from torchvision import datasets, transforms
 from tqdm import tqdm
 
 from nupic.torch.modules import KWinners2d, rezero_weights, update_boost_strength
-from bit import PreActBottleneck, tf2th
+from bit import *
 
 seed_val = 1
 torch.manual_seed(seed_val)
@@ -278,7 +277,7 @@ class SDRBiT(nn.Module):
         ]))
         self.k_winner = KWinners2d(channels=OUT_DIM, percent_on=percent_on,
                                    boost_strength=boost_strength, local=True)
-        with torch.no_grad(): self.shape = self.root(self.body(torch.zeros(3,128,128))).shape[-1]
+        with torch.no_grad(): self.shape = self.body(self.root(torch.zeros(1,3,128,128))).shape[-1]
         self.dense1 = nn.Linear(in_features=OUT_DIM * self.shape * self.shape, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
@@ -292,7 +291,7 @@ class SDRBiT(nn.Module):
                     unit.load_from(weights, prefix=f'{prefix}{bname}/{uname}/')
 
     def until_kwta(self, inputs):
-        x = self.root(x)
+        x = self.root(inputs)
         x = self.body(x)
         x = self.k_winner(x)
         x = x.view(-1, OUT_DIM * self.shape * self.shape)
