@@ -121,27 +121,32 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
     :return: Dict with "accuracy", "loss" and "total_correct"
     """
     model.eval()
+    total = len(loader)
     loss = 0
     total_correct = 0
 
     # Store data for SDR-based classifiers
-    all_sdrs = []
-    all_labels = []
-
     with torch.no_grad():
-        for data, target in tqdm(loader,total=len(loader)):
+        print("Allocating SDRs array...")
+        all_sdrs = torch.zeros((total,OUT_DIM*GRID_SIZE*GRID_SIZE))
+        all_labels = torch.zeros((total,1))
+
+        i = 0
+        for data, target in tqdm(loader,total=total):
 
             data, target = data.to(device), target.to(device)
             output = model(data)
 
-            all_sdrs.append(np.array(model.output_sdr(data).cpu()))
-            all_labels.append(target)
+            all_sdrs[i] = model.output_sdr(data)
+            all_labels[i] = target
 
             loss += criterion(output, target, reduction="sum").item()  # sum up batch
             # loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max
             # log-probability
             total_correct += pred.eq(target.view_as(pred)).sum().item()
+
+            i += 1
 
         # Track data on duty-cycle in order to optimize sparse representation for SDR
         # output
@@ -158,24 +163,13 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
                 + str(epoch) + ".png")
     plt.clf()
 
-    #print('sdrs', type(all_sdrs[0]))
-    try:
-        all_sdrs = np.concatenate([a.cpu() for a in all_sdrs], axis=0)
-    except:
-        all_sdrs = np.concatenate(all_sdrs, axis=0)
-    #print('labels', type(all_labels[0]))
-    try:
-        all_labels = np.concatenate([a.cpu() for a in all_labels], axis=0)
-    except:
-        all_labels = np.concatenate(all_labels, axis=0)
-
     if sdr_output_subset is not None:
         print("Saving generated SDR and label outputs from data sub-section: "
               + sdr_output_subset)
         np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
-                + "_SDRs_" + sdr_output_subset, all_sdrs)
+                + "_SDRs_" + sdr_output_subset, all_sdrs.cpu().numpy())
         np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
-                + "_labels_" + sdr_output_subset, all_labels)
+                + "_labels_" + sdr_output_subset, all_labels.cpu().numpy())
 
     return {"accuracy": total_correct / test_size,
             "loss": loss / test_size,
