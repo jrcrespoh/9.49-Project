@@ -60,6 +60,7 @@ DATASET = "cifar"
 
 MODEL = "BiT"
 OUT_DIM = 256
+GRID_SIZE = 5
 BLOCK_UNITS = [3]
 PRETRAINED = True
 WEIGHTS = "R50x1_160.npz"
@@ -275,13 +276,10 @@ class SDRBiT(nn.Module):
                 [(f'unit{i:02d}', PreActBottleneck(cin=OUT_DIM, cout=OUT_DIM, cmid=64)) for i in range(2, BLOCK_UNITS[0] + 1)],
             ))),
         ]))
-        self.downsample = nn.Sequential(OrderedDict([
-            ('pad', nn.ReplicationPad2d(2)),
-            ('pool', nn.AvgPool2d(kernel_size=4, stride=4, padding=0)),
-        ]))
+        self.shape = GRID_SIZE
+        self.downsample = nn.AdaptiveAvgPool2d(self.shape)
         self.k_winner = KWinners2d(channels=OUT_DIM, percent_on=percent_on,
                                    boost_strength=boost_strength, local=True)
-        with torch.no_grad(): self.shape = self.downsample(self.body(self.root(torch.zeros(1,in_channels,128,128)))).shape[-1]
         self.dense1 = nn.Linear(in_features=OUT_DIM * self.shape * self.shape, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
