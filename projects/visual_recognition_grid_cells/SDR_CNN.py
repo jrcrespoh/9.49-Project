@@ -66,9 +66,9 @@ WEIGHTS = "R50x1_160.npz"
 
 LEARNING_RATE = 0.01  # Recommend 0.01
 MOMENTUM = 0.5  # Recommend 0.5
-EPOCHS = 10  # Recommend 10
+EPOCHS = 2  # Recommend 10
 FIRST_EPOCH_BATCH_SIZE = 4  # Used for optimizing k-WTA
-TRAIN_BATCH_SIZE = 128  # Recommend 128
+TRAIN_BATCH_SIZE = 512  # Recommend 128
 TEST_BATCH_SIZE = 1000
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -275,9 +275,13 @@ class SDRBiT(nn.Module):
                 [(f'unit{i:02d}', PreActBottleneck(cin=OUT_DIM, cout=OUT_DIM, cmid=64)) for i in range(2, BLOCK_UNITS[0] + 1)],
             ))),
         ]))
+        self.downsample = nn.Sequential(OrderedDict([
+            ('pad', nn.ReplicationPad2d(2)),
+            ('pool', nn.AvgPool2d(kernel_size=4, stride=4, padding=0)),
+        ]))
         self.k_winner = KWinners2d(channels=OUT_DIM, percent_on=percent_on,
                                    boost_strength=boost_strength, local=True)
-        with torch.no_grad(): self.shape = self.body(self.root(torch.zeros(1,3,128,128))).shape[-1]
+        with torch.no_grad(): self.shape = self.downsample(self.body(self.root(torch.zeros(1,in_channels,128,128)))).shape[-1]
         self.dense1 = nn.Linear(in_features=OUT_DIM * self.shape * self.shape, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
@@ -293,6 +297,7 @@ class SDRBiT(nn.Module):
     def until_kwta(self, inputs):
         x = self.root(inputs)
         x = self.body(x)
+        x = self.downsample(x)
         x = self.k_winner(x)
         x = x.view(-1, OUT_DIM * self.shape * self.shape)
 
@@ -357,9 +362,9 @@ def data_setup():
             train=True,
             download=True,
             transform=transforms.Compose(
-                [] if MODEL != "BiT" else [transforms.Resize((160, 160)),
+                ([] if MODEL != "BiT" else [transforms.Resize((160, 160)),
                                            transforms.RandomCrop((128, 128)),
-                                           transforms.RandomHorizontalFlip(),] +
+                                           transforms.RandomHorizontalFlip(),]) +
                 [transforms.ToTensor(),
                  transforms.Normalize((0.4914, 0.4822, 0.4465),(0.247, 0.243, 0.261))]
             )
@@ -370,7 +375,7 @@ def data_setup():
             train=False,
             download=True,
             transform=transforms.Compose(
-                [] if MODEL != "BiT" else [transforms.Resize((128, 128)),] +
+                ([] if MODEL != "BiT" else [transforms.Resize((128, 128)),]) +
                 [transforms.ToTensor(),
                  transforms.Normalize((0.4914, 0.4822, 0.4465),(0.247, 0.243, 0.261))]
             )
