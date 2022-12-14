@@ -67,7 +67,7 @@ WEIGHTS = "R50x1_160.npz"
 
 LEARNING_RATE = 0.01  # Recommend 0.01
 MOMENTUM = 0.5  # Recommend 0.5
-EPOCHS = 2  # Recommend 10
+EPOCHS = 10  # Recommend 10
 FIRST_EPOCH_BATCH_SIZE = 4  # Used for optimizing k-WTA
 TRAIN_BATCH_SIZE = 2048  # Recommend 128
 TEST_BATCH_SIZE = 1000
