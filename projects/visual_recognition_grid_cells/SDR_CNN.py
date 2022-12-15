@@ -53,24 +53,30 @@ TRAIN_NEW_NET = True  # To generate all the SDRs needed for down-stream use in o
 PERCENT_ON = 0.15  # Recommend 0.15
 BOOST_STRENGTH = 20.0  # Recommend 20
 
-# DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
+DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
 DATASET = "cifar"
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of
 # SDRs by downstream classifiers)
 
+MODEL = "BaseCNN"
 MODEL = "BiT"
+OUT_DIM = 128
 OUT_DIM = 256
+GRID_SIZE = 6
 GRID_SIZE = 5
 BLOCK_UNITS = [3]
-PRETRAINED = True
+PRETRAINED = False
+#PRETRAINED = True
 WEIGHTS = "R50x1_160.npz"
 
 LEARNING_RATE = 0.01  # Recommend 0.01
 MOMENTUM = 0.5  # Recommend 0.5
 EPOCHS = 10  # Recommend 10
 FIRST_EPOCH_BATCH_SIZE = 4  # Used for optimizing k-WTA
-TRAIN_BATCH_SIZE = 2048  # Recommend 128
+#FIRST_EPOCH_BATCH_SIZE = 1024
+TRAIN_BATCH_SIZE = 1024  # Recommend 128
 TEST_BATCH_SIZE = 1000
+#TEST_BATCH_SIZE = 1024
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device: " + str(device))
@@ -121,32 +127,36 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
     :return: Dict with "accuracy", "loss" and "total_correct"
     """
     model.eval()
-    total = len(loader)
+    total = len(loader.dataset)
     loss = 0
     total_correct = 0
 
     # Store data for SDR-based classifiers
     with torch.no_grad():
-        print("Allocating SDRs array...")
-        all_sdrs = torch.zeros((total,OUT_DIM*GRID_SIZE*GRID_SIZE))
-        all_labels = torch.zeros((total,1))
+        if sdr_output_subset is not None:
+            print("Allocating SDRs array with shape ",
+                (total,OUT_DIM*GRID_SIZE*GRID_SIZE))
+            all_sdrs = torch.zeros((total,OUT_DIM*GRID_SIZE*GRID_SIZE))
+            all_labels = torch.zeros(total)
 
-        i = 0
-        for data, target in tqdm(loader,total=total):
+            i = 0
+
+        for data, target in tqdm(loader,total=len(loader)):
 
             data, target = data.to(device), target.to(device)
             output = model(data)
-
-            all_sdrs[i] = model.output_sdr(data)
-            all_labels[i] = target
-
             loss += criterion(output, target, reduction="sum").item()  # sum up batch
             # loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max
             # log-probability
             total_correct += pred.eq(target.view_as(pred)).sum().item()
-
-            i += 1
+            
+            if sdr_output_subset is not None:
+                sdr = model.output_sdr(data)
+                batch_size = sdr.shape[0]
+                all_sdrs[i:i+batch_size] = sdr
+                all_labels[i:i+batch_size] = target
+                i += batch_size
 
         # Track data on duty-cycle in order to optimize sparse representation for SDR
         # output
