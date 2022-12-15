@@ -61,14 +61,17 @@ SCALE = True
 # SDRs by downstream classifiers)
 
 MODEL = "BaseCNN"
+GRID_SIZE = 6
 MODEL = "BiT"
 OUT_DIM = 128
-OUT_DIM = 256
-GRID_SIZE = 6
 GRID_SIZE = 5
-BLOCK_UNITS = [3]
+BLOCK_UNITS = [3, 4, 6, 3]
 PRETRAINED = False
 PRETRAINED = True
+OUT_DIM = 256
+FULL = False
+FULL = True
+OUT_DIM = 2048
 WEIGHTS = "R50x1_160.npz"
 
 LEARNING_RATE = 0.01  # Recommend 0.01
@@ -286,7 +289,25 @@ class SDRBiT(nn.Module):
                 [('unit01', PreActBottleneck(cin=64, cout=OUT_DIM, cmid=64))] +
                 [(f'unit{i:02d}', PreActBottleneck(cin=OUT_DIM, cout=OUT_DIM, cmid=64)) for i in range(2, BLOCK_UNITS[0] + 1)],
             ))),
+        ] if not FULL else [
+            ('block1', nn.Sequential(OrderedDict(
+                [('unit01', PreActBottleneck(cin=64, cout=256, cmid=64))] +
+                [(f'unit{i:02d}', PreActBottleneck(cin=256, cout=256, cmid=64)) for i in range(2, BLOCK_UNITS[0] + 1)],
+            ))),
+            ('block2', nn.Sequential(OrderedDict(
+                [('unit01', PreActBottleneck(cin=256, cout=512, cmid=128, stride=2))] +
+                [(f'unit{i:02d}', PreActBottleneck(cin=512, cout=512, cmid=128)) for i in range(2, BLOCK_UNITS[1] + 1)],
+            ))),
+            ('block3', nn.Sequential(OrderedDict(
+                [('unit01', PreActBottleneck(cin=512, cout=1024, cmid=256, stride=2))] +
+                [(f'unit{i:02d}', PreActBottleneck(cin=1024, cout=1024, cmid=256)) for i in range(2, BLOCK_UNITS[2] + 1)],
+            ))),
+            ('block4', nn.Sequential(OrderedDict(
+                [('unit01', PreActBottleneck(cin=1024, cout=2048, cmid=512, stride=2))] +
+                [(f'unit{i:02d}', PreActBottleneck(cin=2048, cout=2048, cmid=512)) for i in range(2, BLOCK_UNITS[3] + 1)],
+            ))),
         ]))
+
         self.shape = GRID_SIZE
         self.downsample = nn.AdaptiveAvgPool2d(self.shape)
         self.k_winner = KWinners2d(channels=OUT_DIM, percent_on=percent_on,
