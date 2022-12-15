@@ -47,6 +47,7 @@ np.random.seed(seed_val)
 
 # Parameters
 TRAIN_NEW_NET = True  # To generate all the SDRs needed for down-stream use in other
+TRAIN_NEW_NET = False
 # programs, train a network and run this again with TRAIN_NEW_NET=False
 
 # k-WTA parameters
@@ -54,8 +55,8 @@ PERCENT_ON = 0.15  # Recommend 0.15
 BOOST_STRENGTH = 20.0  # Recommend 20
 
 DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
-#DATASET = "cifar"
-SCALE = False
+DATASET = "cifar"
+SCALE = True
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of
 # SDRs by downstream classifiers)
 
@@ -496,7 +497,7 @@ if __name__ == "__main__":
         print("Saving network state...")
         torch.save(sdr_cnn.state_dict(), "saved_networks/sdr_cnn.pt")
 
-    else:
+    elif MODEL != "BiT":
         print("Evaluating a pre-trained model:")
         sdr_cnn.load_state_dict(torch.load("saved_networks/sdr_cnn.pt"))
 
