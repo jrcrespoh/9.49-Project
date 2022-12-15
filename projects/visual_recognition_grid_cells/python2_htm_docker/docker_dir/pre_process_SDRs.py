@@ -81,7 +81,7 @@ def generate_image_objects(
         "8": 0,
         "9": 0}
 
-    dims = int(input_data_samples.shape[-1]/objectWidth/objectWidth)
+    dims = int(input_data.shape[-1]/objectWidth/objectWidth)
     for sample_iter in range(len(label_samples)):
 
         # sample_temp = np.reshape(input_data_samples[sample_iter],
