@@ -132,31 +132,25 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
     total_correct = 0
 
     # Store data for SDR-based classifiers
+    if sdr_output_subset is not None:
+        all_sdrs = []
+        all_labels = []
+
     with torch.no_grad():
-        if sdr_output_subset is not None:
-            print("Allocating SDRs array with shape ",
-                (total,OUT_DIM*GRID_SIZE*GRID_SIZE))
-            all_sdrs = torch.zeros((total,OUT_DIM*GRID_SIZE*GRID_SIZE))
-            all_labels = torch.zeros(total)
-
-            i = 0
-
         for data, target in tqdm(loader,total=len(loader)):
 
             data, target = data.to(device), target.to(device)
             output = model(data)
+
+            if sdr_output_subset is not None:
+                all_sdrs.append(np.array(model.output_sdr(data).cpu()))
+                all_labels.append(target)
+
             loss += criterion(output, target, reduction="sum").item()  # sum up batch
             # loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max
             # log-probability
             total_correct += pred.eq(target.view_as(pred)).sum().item()
-            
-            if sdr_output_subset is not None:
-                sdr = model.output_sdr(data)
-                batch_size = sdr.shape[0]
-                all_sdrs[i:i+batch_size] = sdr
-                all_labels[i:i+batch_size] = target
-                i += batch_size
 
         # Track data on duty-cycle in order to optimize sparse representation for SDR
         # output
@@ -174,12 +168,23 @@ def test(model, loader, test_size, criterion, epoch, sdr_output_subset=None):
     plt.clf()
 
     if sdr_output_subset is not None:
+        #print('sdrs', type(all_sdrs[0]))
+        try:
+            all_sdrs = np.concatenate([a.cpu() for a in all_sdrs], axis=0)
+        except:
+            all_sdrs = np.concatenate(all_sdrs, axis=0)
+        #print('labels', type(all_labels[0]))
+        try:
+            all_labels = np.concatenate([a.cpu() for a in all_labels], axis=0)
+        except:
+            all_labels = np.concatenate(all_labels, axis=0)
+
         print("Saving generated SDR and label outputs from data sub-section: "
               + sdr_output_subset)
         np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
-                + "_SDRs_" + sdr_output_subset, all_sdrs.cpu().numpy())
+                + "_SDRs_" + sdr_output_subset, all_sdrs)
         np.save("python2_htm_docker/docker_dir/training_and_testing_data/" + DATASET
-                + "_labels_" + sdr_output_subset, all_labels.cpu().numpy())
+                + "_labels_" + sdr_output_subset, all_labels)
 
     return {"accuracy": total_correct / test_size,
             "loss": loss / test_size,
