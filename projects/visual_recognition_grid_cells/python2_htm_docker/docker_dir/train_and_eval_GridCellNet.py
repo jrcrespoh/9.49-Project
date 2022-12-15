@@ -56,7 +56,7 @@ CLASS_THRESHOLDS_LIST = [0.3]  # Determines the relative activity threshold that
 INPUT_GRID_DIMENSION = 5  # Options are 4 or 5, depending on the kind of pre-processing
 # of the input used i.e. 7x7 pixel patches on a 4x4 grid, or 5x5 grid extracted from
 # the middle layer of a CNN
-INPUT_FEATURE_DIMENSION = 256
+INPUT_FEATURE_DIMENSION = 128
 
 NUM_TEST_OBJECTS_PER_CLASS = 100  # The number of test objects per class to use during
 # evaluation
