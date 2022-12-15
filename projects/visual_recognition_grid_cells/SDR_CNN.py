@@ -54,7 +54,8 @@ PERCENT_ON = 0.15  # Recommend 0.15
 BOOST_STRENGTH = 20.0  # Recommend 20
 
 DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
-DATASET = "cifar"
+#DATASET = "cifar"
+SCALE = False
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of
 # SDRs by downstream classifiers)
 
@@ -66,7 +67,7 @@ GRID_SIZE = 6
 GRID_SIZE = 5
 BLOCK_UNITS = [3]
 PRETRAINED = False
-#PRETRAINED = True
+PRETRAINED = True
 WEIGHTS = "R50x1_160.npz"
 
 LEARNING_RATE = 0.01  # Recommend 0.01
@@ -344,13 +345,34 @@ def data_setup():
 
     if DATASET == "mnist":
         print("Using MNIST data-set")
-        normalize = transforms.Compose([transforms.ToTensor(),
-                                       transforms.Normalize((0.1307,), (0.3081,))])
-        train_dataset = datasets.MNIST("data", train=True, download=True,
-                                       transform=normalize)
-        test_dataset = datasets.MNIST("data", train=False,
-                                      download=True,
-                                      transform=normalize)
+        train_dataset = datasets.MNIST(
+            "data",
+            train=True,
+            download=True,
+            transform=transforms.Compose(
+                ([] if not SCALE else [transforms.Resize((160, 160)),
+                                           transforms.RandomCrop((128, 128)),
+                                           transforms.RandomHorizontalFlip(),]) +
+                [transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,))] +
+                ([] if not PRETRAINED else [transforms.Lambda(
+                    lambda x: x.repeat(3,1,1)
+                )])
+            )
+        )
+        test_dataset = datasets.MNIST(
+            "data",
+            train=False,
+            download=True,
+            transform=transforms.Compose(
+                ([] if not SCALE else [transforms.Resize((128, 128)),]) +
+                [transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,))] +
+                ([] if not PRETRAINED else [transforms.Lambda(
+                    lambda x: x.repeat(3,1,1)
+                )])
+            )
+        )
 
     elif DATASET == "fashion_mnist":
         print("Using Fashion-MNIST data-set")
@@ -369,7 +391,7 @@ def data_setup():
             train=True,
             download=True,
             transform=transforms.Compose(
-                ([] if MODEL != "BiT" else [transforms.Resize((160, 160)),
+                ([] if not SCALE else [transforms.Resize((160, 160)),
                                            transforms.RandomCrop((128, 128)),
                                            transforms.RandomHorizontalFlip(),]) +
                 [transforms.ToTensor(),
@@ -382,7 +404,7 @@ def data_setup():
             train=False,
             download=True,
             transform=transforms.Compose(
-                ([] if MODEL != "BiT" else [transforms.Resize((128, 128)),]) +
+                ([] if not SCALE else [transforms.Resize((128, 128)),]) +
                 [transforms.ToTensor(),
                  transforms.Normalize((0.4914, 0.4822, 0.4465),(0.247, 0.243, 0.261))]
             )
@@ -422,7 +444,7 @@ if __name__ == "__main__":
     (first_loader, train_loader, test_cnn_loader, test_sdrc_loader, training_len,
         testing_cnn_len, testing_sdr_classifier_len) = data_setup()
 
-    in_channels = 3 if DATASET == 'cifar' else 1
+    in_channels = 3 if DATASET == 'cifar' or PRETRAINED else 1 
     cnn = SDRCNNBase if MODEL != "BiT" else SDRBiT
     sdr_cnn = cnn(in_channels=in_channels, percent_on=PERCENT_ON, boost_strength=BOOST_STRENGTH)
     if PRETRAINED:
