@@ -229,15 +229,16 @@ class SDRCNNBase(nn.Module):
     """
     def __init__(self, in_channels, percent_on, boost_strength):
         super(SDRCNNBase, self).__init__()
+        self.shape = GRID_SIZE
         self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=5,
                                padding=2)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=5,
                                padding=0)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.downsample = nn.AdaptiveAvgPool2d(GRID_SIZE)
         self.k_winner = KWinners2d(channels=128, percent_on=percent_on,
                                    boost_strength=boost_strength, local=True)
-        self.shape = 6 if DATASET == 'cifar' else 5
         self.dense1 = nn.Linear(in_features=128 * self.shape * self.shape, out_features=256)
         self.dense2 = nn.Linear(in_features=256, out_features=128)
         self.output = nn.Linear(in_features=128, out_features=10)
@@ -248,6 +249,7 @@ class SDRCNNBase(nn.Module):
         x = self.pool1(x)
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
+        if DATASET == "CIFAR10": x = self.downsample(x)
         x = self.k_winner(x)
         x = x.view(-1, 128 * self.shape * self.shape)
 
