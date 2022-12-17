@@ -48,14 +48,17 @@ np.random.seed(seed_val)
 # Parameters
 TRAIN_NEW_NET = True  # To generate all the SDRs needed for down-stream use in other
 TRAIN_NEW_NET = False
+EVALUATE = False
+EVALUATE = True
 # programs, train a network and run this again with TRAIN_NEW_NET=False
 
 # k-WTA parameters
 PERCENT_ON = 0.15  # Recommend 0.15
 BOOST_STRENGTH = 20.0  # Recommend 20
 
-DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
+#DATASET = "mnist"  # Options are "mnist" or "fashion_mnist"; note in some cases
 DATASET = "cifar"
+SCALE = False
 SCALE = True
 # fashion-MNIST may not have full functionality (e.g. normalization, subsequent use of
 # SDRs by downstream classifiers)
@@ -67,11 +70,11 @@ OUT_DIM = 128
 GRID_SIZE = 5
 BLOCK_UNITS = [3, 4, 6, 3]
 PRETRAINED = False
-PRETRAINED = True
+#PRETRAINED = True
 OUT_DIM = 256
 FULL = False
-FULL = True
-OUT_DIM = 2048
+#FULL = True
+#OUT_DIM = 2048
 WEIGHTS = "R50x1_160.npz"
 
 LEARNING_RATE = 0.01  # Recommend 0.01
@@ -520,7 +523,7 @@ if __name__ == "__main__":
         print("Saving network state...")
         torch.save(sdr_cnn.state_dict(), "saved_networks/sdr_cnn.pt")
 
-    elif MODEL != "BiT":
+    elif EVALUATE or MODEL != "BiT":
         print("Evaluating a pre-trained model:")
         sdr_cnn.load_state_dict(torch.load("saved_networks/sdr_cnn.pt"))
 
@@ -529,18 +532,18 @@ if __name__ == "__main__":
           "base_net_training, and are used later to train the decoder")
     results = test(model=sdr_cnn, loader=train_loader, test_size=training_len,
                    epoch="final_train", criterion=F.nll_loss,
-                   sdr_output_subset="base_net_training")
+                   sdr_output_subset=None if EVALUATE else "base_net_training")
     print(results)
     print("\nResults from data-set for evaluating CNN/decoder. The output SDRs are "
           "saved as SDR_classifiers_training")
     results = test(model=sdr_cnn, loader=test_cnn_loader, test_size=testing_cnn_len,
                    epoch="test_CNN", criterion=F.nll_loss,
-                   sdr_output_subset="SDR_classifiers_training")
+                   sdr_output_subset=None if EVALUATE else "SDR_classifiers_training")
     print(results)
     print("\nResults from data-set for evaluating later SDR-based classifiers. The "
           "output SDRs are saved as SDR_classifiers_testing")
     results = test(model=sdr_cnn, loader=test_sdrc_loader,
                    test_size=testing_sdr_classifier_len,
                    epoch="test_SDRs", criterion=F.nll_loss,
-                   sdr_output_subset="SDR_classifiers_testing")
+                   sdr_output_subset=None if EVALUATE else "SDR_classifiers_testing")
     print(results)
