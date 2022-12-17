@@ -249,7 +249,7 @@ class SDRCNNBase(nn.Module):
         x = self.pool1(x)
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
-        if DATASET == "CIFAR10": x = self.downsample(x)
+        if DATASET != "mnist": x = self.downsample(x)
         x = self.k_winner(x)
         x = x.view(-1, 128 * self.shape * self.shape)
 
